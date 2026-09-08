@@ -1,0 +1,10 @@
+[package]
+name = "conwayrs"
+version = "0.1.0"
+edition = "2024"
+readme = "README.md"
+license = "MIT"
+license-file = "LICENSE"
+authors = ["envis10n <envis10n@envis10n.dev>"]
+
+[dependencies]
