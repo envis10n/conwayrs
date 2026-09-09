@@ -1,19 +1,34 @@
 use crate::vec2d::Vec2D;
+use fastrand::Rng;
 
 /// A map for cells to exist in.
 pub struct CellMap {
     width: u32,
     height: u32,
     cells: Vec<bool>,
+    seed: u64,
 }
 
 impl CellMap {
     /// Create a new CellMap with the provided width and height.
-    pub fn new(width: u32, height: u32) -> Self {
+    pub fn new(width: u32, height: u32, seed: u64) -> Self {
+        let mut rng = Rng::new();
+        let mut cells = vec![false; (width * height) as usize];
+        for i in 0..((width * height) as usize) {
+            cells[i] = rng.bool();
+        }
         CellMap {
             width,
             height,
-            cells: vec![false; (width * height) as usize],
+            cells,
+            seed,
+        }
+    }
+    /// Reset the cells back to the initial state based on the provided seed.
+    pub fn reset(&mut self) {
+        let mut rng = Rng::with_seed(self.seed);
+        for i in 0..self.count() {
+            self.cells[i] = rng.bool();
         }
     }
     /// The amount of cells in this map.
@@ -81,5 +96,8 @@ impl CellMap {
     /// Update the internal cell vector with new states.
     pub fn update_map(&mut self, cells: Vec<bool>) {
         self.cells.copy_from_slice(&cells[..]);
+    }
+    pub fn to_slice(&self) -> &[bool] {
+        &self.cells[..]
     }
 }
