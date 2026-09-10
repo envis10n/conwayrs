@@ -12,7 +12,7 @@ pub struct CellMap {
 impl CellMap {
     /// Create a new CellMap with the provided width and height.
     pub fn new(width: u32, height: u32, seed: u64) -> Self {
-        let mut rng = Rng::new();
+        let mut rng = Rng::with_seed(seed);
         let mut cells = vec![false; (width * height) as usize];
         for i in 0..((width * height) as usize) {
             cells[i] = rng.bool();
@@ -51,11 +51,11 @@ impl CellMap {
     pub fn get_neighbors(&self, pos: Vec2D) -> Vec<(Vec2D, bool)> {
         let mut res: Vec<(Vec2D, bool)> = vec![];
         for y in (pos.y - 1)..=(pos.y + 1) {
-            if y < 0 || y == pos.y || y > (self.height - 1) as i32 {
+            if y < 0 || y > (self.height - 1) as i32 {
                 continue;
             }
             for x in (pos.x - 1)..=(pos.x + 1) {
-                if x < 0 || x == pos.x || x > (self.width - 1) as i32 {
+                if x < 0 || (x == pos.x && y == pos.y) || x > (self.width - 1) as i32 {
                     continue;
                 }
                 let p = Vec2D::new(x, y);
