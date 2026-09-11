@@ -25,3 +25,4 @@ TODO: keybindings???
 
 - `Spacebar` Starts and stops the simulation.
 - `Backspace` Stops the simulation and then resets the cell states using the random seed.
+- `Escape` Closes the application.
