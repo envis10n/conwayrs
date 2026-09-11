@@ -2,6 +2,8 @@ mod cell;
 mod vec2d;
 
 use cell::CellMap;
+use clap::Parser;
+use fastrand::Rng;
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
 use std::sync::Arc;
 use winit::application::ApplicationHandler;
@@ -11,23 +13,29 @@ use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowButtons, WindowId};
 
-/// The simulation / base width.
-const FRAME_WIDTH: u32 = 128;
-/// The simulation / base height.
-const FRAME_HEIGHT: u32 = 128;
-/// The scale to apply to the width / height to get the final window size.
-const FRAME_SCALE: u32 = 4;
-/// The simulation rate, in hertz (fps).
-const SIM_RATE: u32 = 20;
-/// The random seed to use for the initial state.
-///
-/// Keeping this the same value will deterministically set the initial cell states.
-const RANDOM_SEED: u64 = 1337;
-/// Window Logical Size for use with DPI scaling.
-const WINDOW_SIZE: LogicalSize<u32> =
-    LogicalSize::new(FRAME_WIDTH * FRAME_SCALE, FRAME_HEIGHT * FRAME_SCALE);
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+struct Cli {
+    /// Simulation bounds width.
+    #[arg(short, long, default_value_t = 128)]
+    width: u32,
+    /// Simulation bounds height.
+    #[arg(short = 'H', long, default_value_t = 128)]
+    height: u32,
+    /// Simulation scale (window size).
+    #[arg(short, long, default_value_t = 4)]
+    scale: u32,
+    /// Simulation rate in hertz.
+    #[arg(short, long, default_value_t = 20)]
+    rate: u32,
+    /// Seed to use for RNG. Omitting this will use a random seed.
+    #[arg(short = 'S', long)]
+    seed: Option<u64>,
+}
 
 struct App {
+    args: Cli,
+    window_size: LogicalSize<u32>,
     window: Option<Arc<Window>>,
     pixels: Option<Pixels<'static>>,
     cells: CellMap,
@@ -36,6 +44,8 @@ struct App {
     last_frame: f64,
     sim_rate: f32,
     sim_timer: f64,
+    window_title: String,
+    sim_seed: u64,
 }
 
 /// Get the time since epoch in milliseconds.
@@ -48,11 +58,19 @@ fn epoch_ms() -> f64 {
 }
 
 impl App {
-    pub fn new() -> Self {
-        let cells = CellMap::new(FRAME_WIDTH, FRAME_HEIGHT, RANDOM_SEED);
+    pub fn new(args: Cli) -> Self {
+        let sim_seed: u64 = if let Some(seed) = args.seed {
+            seed
+        } else {
+            Rng::new().get_seed()
+        };
+        let cells = CellMap::new(args.width, args.height, sim_seed);
+        let window_size = LogicalSize::new(args.width * args.scale, args.height * args.scale);
         let now = epoch_ms();
-        let sim_rate = 1000f32 / SIM_RATE as f32;
+        let sim_rate = 1000f32 / args.rate as f32;
         App {
+            args,
+            window_size,
             window: None,
             pixels: None,
             cells,
@@ -61,6 +79,8 @@ impl App {
             last_frame: now,
             sim_rate,
             sim_timer: sim_rate as f64,
+            window_title: format!("ConwayRS | Seed: {} (Paused)", sim_seed),
+            sim_seed,
         }
     }
     /// Render the simulation state to the SurfaceTexture.
@@ -94,9 +114,9 @@ impl ApplicationHandler for App {
             event_loop
                 .create_window(
                     Window::default_attributes()
-                        .with_title("ConwayRS")
-                        .with_min_inner_size(WINDOW_SIZE)
-                        .with_inner_size(WINDOW_SIZE)
+                        .with_title(&self.window_title)
+                        .with_min_inner_size(self.window_size)
+                        .with_inner_size(self.window_size)
                         .with_resizable(false)
                         .with_enabled_buttons(WindowButtons::CLOSE | WindowButtons::MINIMIZE),
                 )
@@ -105,9 +125,13 @@ impl ApplicationHandler for App {
         self.window = Some(window.clone());
         self.pixels = Some(
             PixelsBuilder::new(
-                FRAME_WIDTH,
-                FRAME_HEIGHT,
-                SurfaceTexture::new(WINDOW_SIZE.width, WINDOW_SIZE.height, window.clone()),
+                self.args.width,
+                self.args.height,
+                SurfaceTexture::new(
+                    self.window_size.width,
+                    self.window_size.height,
+                    window.clone(),
+                ),
             )
             .build()
             .unwrap(),
@@ -154,6 +178,11 @@ impl ApplicationHandler for App {
                 {
                     // Start or stop the simulation.
                     self.should_tick = !self.should_tick;
+                    let state = if self.should_tick { "" } else { " (Paused)" };
+                    self.window
+                        .as_ref()
+                        .unwrap()
+                        .set_title(&format!("ConwayRS | Seed: {}{}", self.sim_seed, state));
                 }
                 // Handle Backspace
                 else if let Key::Named(NamedKey::Backspace) = event.logical_key
@@ -164,6 +193,18 @@ impl ApplicationHandler for App {
                     self.should_tick = false;
                     self.cells.reset();
                     self.render_sim();
+                    self.window
+                        .as_ref()
+                        .unwrap()
+                        .set_title(&format!("ConwayRS | Seed: {} (Paused)", self.sim_seed));
+                }
+                // Handle Esc
+                else if let Key::Named(NamedKey::Escape) = event.logical_key
+                    && event.state == ElementState::Released
+                {
+                    // Exit
+                    println!("Goodbye!");
+                    event_loop.exit();
                 }
             }
             _ => {}
@@ -172,8 +213,9 @@ impl ApplicationHandler for App {
 }
 
 fn main() {
+    let cli = Cli::parse();
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
-    let mut app = App::new();
+    let mut app = App::new(cli);
     event_loop.run_app(&mut app).unwrap();
 }
