@@ -13,6 +13,8 @@ use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowButtons, WindowId};
 
+use crate::cell::CellRuleConway;
+
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
@@ -161,7 +163,8 @@ impl ApplicationHandler for App {
                     if self.sim_timer <= 0f64 {
                         // When we hit zero, run the simulation tick and set the timer back to the rate.
                         self.sim_timer = self.sim_rate as f64;
-                        self.cells.tick();
+                        // By default we will use the Conway rules.
+                        self.cells.tick::<CellRuleConway>();
                         self.render_sim();
                     }
                 }

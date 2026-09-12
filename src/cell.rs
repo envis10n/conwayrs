@@ -67,29 +67,15 @@ impl CellMap {
     /// Tick the CellMap to simulate the next generation.
     ///
     /// TODO: Allow for multiple rulesets.
-    pub fn tick(&mut self) {
+    pub fn tick<T>(&mut self)
+    where
+        T: CellRule,
+    {
         let mut res = self.cells.clone();
         for idx in 0..self.count() as usize {
             let pos = Vec2D::from_index(idx, self.width as i32);
             let state = self.cells[idx];
-            let mut alive = 0;
-            for (_, s) in self.get_neighbors(pos) {
-                if s {
-                    alive += 1;
-                }
-            }
-            if state {
-                if alive < 2 {
-                    // Alive, less than 2 living neighbors.
-                    res[idx] = false;
-                } else if alive > 3 {
-                    // Alive, more than 3 living neighbors.
-                    res[idx] = false;
-                }
-            } else if !state && alive == 3 {
-                // Dead, exactly 3 living neighbors.
-                res[idx] = true;
-            }
+            res[idx] = T::apply_rule(self.get_neighbors(pos), state);
         }
         self.update_map(res);
     }
@@ -99,5 +85,42 @@ impl CellMap {
     }
     pub fn to_slice(&self) -> &[bool] {
         &self.cells[..]
+    }
+}
+
+/// Describes a Cell Rule that determines the new state of the current cell.
+pub trait CellRule {
+    /// Returns the new state of the current cell based on the cell's neighbors and current state.
+    fn apply_rule(neighbors: Vec<(Vec2D, bool)>, state: bool) -> bool;
+}
+
+/// Conway's Game of Life Ruleset
+pub struct CellRuleConway {}
+
+impl CellRule for CellRuleConway {
+    fn apply_rule(neighbors: Vec<(Vec2D, bool)>, state: bool) -> bool {
+        let mut alive = 0;
+        // Count living neighbors.
+        for (_, s) in neighbors {
+            if s {
+                alive += 1;
+            }
+        }
+        if state {
+            if alive < 2 {
+                // Alive, less than 2 living neighbors.
+                false
+            } else if alive > 3 {
+                // Alive, more than 3 living neighbors.
+                false
+            } else {
+                state
+            }
+        } else if alive == 3 {
+            // Dead, exactly 3 living neighbors.
+            true
+        } else {
+            state
+        }
     }
 }
